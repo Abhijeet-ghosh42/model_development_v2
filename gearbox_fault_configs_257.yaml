@@ -1,0 +1,17 @@
+stoppage_current_threshold: 40
+norm_args:
+  low_order_current_harmonics:
+  - 0.521031
+  - 0.783555
+  intermediate_order_current_harmonics:
+  - 0.09268
+  - 0.153546
+  high_order_current_harmonics:
+  - 0.0
+  - 0.0
+  odd_parity_current_harmonics:
+  - 0.027823
+  - 0.043371
+  even_parity_current_harmonics:
+  - 12.519126
+  - 16.92035

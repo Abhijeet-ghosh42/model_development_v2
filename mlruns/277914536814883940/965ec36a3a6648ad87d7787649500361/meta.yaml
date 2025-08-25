@@ -1,0 +1,14 @@
+artifact_uri: file:///C:/Projects/model_development/model_development_v2/model_development_v2/mlruns/277914536814883940/965ec36a3a6648ad87d7787649500361/artifacts
+end_time: 1755905365192
+entry_point_name: ''
+experiment_id: '277914536814883940'
+lifecycle_stage: active
+run_id: 965ec36a3a6648ad87d7787649500361
+run_name: winding_fault_config_v1
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1755905361145
+status: 3
+tags: []
+user_id: ghosh

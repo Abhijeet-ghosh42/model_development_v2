@@ -1,0 +1,22 @@
+### Run Documentation
+
+**Deliverable**
+- `winding_fault_configs_m257.yaml` — thresholds for winding-fault detection in real-time.
+
+**Parameters**
+- `tenant_id`: 28
+- `machine_id`: 257
+
+**Method**
+- Thresholds computed as mean + 3.0σ over selected profiles.
+
+**Metrics (for benchmarking)**
+- `cur_imbalance_mean/std`: current phase imbalance stats.
+- `vol_imbalance_mean/std`: voltage phase imbalance stats.
+- `*_thresholds`: derived cutoffs for detection.
+- `quality_index`: `(1 / (cur_std + vol_std)) * log1p(n_rows)`; higher is better.
+
+**Decision Context**
+- The YAML config is consumed by the serving-side detector.
+- Metrics allow internal validation & run comparison.
+- `quality_index` is suitable for automatic promotion.
