@@ -185,6 +185,7 @@ def main(args):
     mlbase = MLflowBase(experiment_name)
     run = mlbase.start_run(run_name=args.approach)
     run_id = run.info.run_id
+    mlflow.set_tag("run_tag", args.run_tag)
     logger.info(f"🚀 Started MLflow Run: {run_id} in Experiment: '{experiment_name}'")
 
     try:
@@ -306,6 +307,10 @@ if __name__ == "__main__":
 
     # example usage:
     # python bearing_model_training.py --tenant-id "28" --machine-id "257" --dataset-filename "iotts.harmonics_257.csv" --shaft-rpm 1480 --ball-diameter 8.0 --pitch-diameter 40.0 --num-elements 8
+    # example production run:
+    # python bearing_model_training.py --tenant-id "28" --machine-id "257" --dataset-filename "iotts.harmonics_257.csv" --shaft-rpm 1480 --ball-diameter 8.0 --pitch-diameter 40.0 --num-elements 8 --run-tag @production
+    # example testing run:
+    # python bearing_model_training.py --tenant-id "28" --machine-id "257" --dataset-filename "iotts.harmonics_257.csv" --shaft-rpm 1480 --ball-diameter 8.0 --pitch-diameter 40.0 --num-elements 8 --run-tag @testing
     
     # --- Required Arguments ---
     parser.add_argument("--tenant-id", type=str, required=True, help="Tenant ID for the machine.")
@@ -322,7 +327,9 @@ if __name__ == "__main__":
     # --- Optional Model/Knob Arguments ---
     parser.add_argument("--approach", type=str, default="bdf_stateless_v1", help="Name for the approach/run (default: bdf_stateless_v1).")
     parser.add_argument("--freq-resolution", type=float, default=50.0, help="Frequency resolution in Hz per bin (default: 50.0).")
-    parser.add_argument("--bdf-threshold", type=float, default=0.7, help="Default BDF decision threshold (default: 0.7).")
+    parser.add_argument("--bdf-threshold", type=float, default=0.9, help="Default BDF decision threshold (default: 0.7).")
+
+    parser.add_argument("--run-tag", type=str, choices=["@production", "@testing"], default="@testing", help="Tag for the MLflow run: '@production' or '@testing'.")
 
     cli_args = parser.parse_args()
     main(cli_args)

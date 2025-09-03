@@ -80,6 +80,7 @@ def main(args):
     mlbase = MLflowBase(experiment_name)
     run = mlbase.start_run(run_name=args.run_name)
     run_id = run.info.run_id
+    mlflow.set_tag("run_tag", args.run_tag)
     logger.info(f"🚀 Started MLflow Run: {run_id} in Experiment: '{experiment_name}'")
 
     try:
@@ -177,7 +178,10 @@ if __name__ == "__main__":
 
     # example usage:
     # python winding_model_training.py --tenant-id "28" --machine-id "257" --dataset-filename "iotts.harmonics_257.csv"
-    
+    # example production run
+    # python winding_model_training.py --tenant-id "28" --machine-id "257" --dataset-filename "iotts.harmonics_257.csv" --run-tag @production
+    # exmple testing run
+    # python winding_model_training.py --tenant-id "28" --machine-id "257" --dataset-filename "iotts.harmonics_257.csv" --run-tag @testing
 
     # --- Required Arguments ---
     parser.add_argument("--tenant-id", type=str, required=True, help="Tenant ID for the machine.")
@@ -187,5 +191,7 @@ if __name__ == "__main__":
     # --- Optional Model/Knob Arguments ---
     parser.add_argument("--run-name", type=str, default="winding_fault_config_v1", help="Name for the approach/run.")
     
+    parser.add_argument("--run-tag", type=str, choices=["@production", "@testing"], default="@testing", help="Tag for the MLflow run: '@production' or '@testing'.")
+
     cli_args = parser.parse_args()
     main(cli_args)

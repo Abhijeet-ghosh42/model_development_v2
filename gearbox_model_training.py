@@ -160,6 +160,7 @@ def main(args):
     mlbase = MLflowBase(experiment_name)
     run = mlbase.start_run(run_name=args.run_name)
     run_id = run.info.run_id
+    mlflow.set_tag("run_tag", args.run_tag)  # <-- Add this line
     logger.info(f"🚀 Started MLflow Run: {run_id} in Experiment: '{experiment_name}'")
 
     try:
@@ -288,6 +289,10 @@ if __name__ == "__main__":
 
     # example usage:
     # python gearbox_model_training.py --tenant-id "28" --machine-id "257" --dataset-filename "iotts.harmonics_257.csv" --run-name "harmonic_profiling_kstest_v1" --use-parity-profiles
+    # example usage for production run
+    # python gearbox_model_training.py --tenant-id "28" --machine-id "257" --dataset-filename "iotts.harmonics_257.csv" --run-name "harmonic_profiling_kstest_v1" --use-parity-profiles --run-tag @production
+    # example run for testing run
+    # python gearbox_model_training.py --tenant-id "28" --machine-id "257" --dataset-filename "iotts.harmonics_257.csv" --run-name "harmonic_profiling_kstest_v1" --use-parity-profiles --run-tag @testing
     
     # --- Required Arguments ---
     parser.add_argument("--tenant-id", type=str, required=True, help="Tenant ID for the machine.")
@@ -302,5 +307,7 @@ if __name__ == "__main__":
     parser.add_argument("--aggregation", type=str, default="max_z", choices=["max_z", "mean_z"], help="Method to aggregate profile Z-scores into a single fault score.")
     parser.add_argument("--threshold-method", type=str, default="mean+3sigma", choices=["mean+3sigma", "p99"], help="Method to derive the decision threshold from the baseline.")
     
+    parser.add_argument("--run-tag", type=str, choices=["@production", "@testing"], default="@testing", help="Tag for the MLflow run: '@production' or '@testing'.")
+
     cli_args = parser.parse_args()
     main(cli_args)

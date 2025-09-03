@@ -121,21 +121,70 @@ def main(args):
     
     with mlflow_wrapper.start_run(run_name=args.run_name) as run:
         run_id = run.info.run_id
+        mlflow.set_tag("run_tag", args.run_tag)
         logger.info(f"🚀 Started MLflow Run: {run_id} in Experiment: '{experiment_name}'")
         
+        # # 2. Data Preparation
+        # dataset_path = os.path.join(DATA_DIR, args.dataset_filename)
+        # df, scaler, shap_background = load_and_prepare_data(dataset_path, args.stoppage_threshold)
+
+        # # check if training duration range is provided, if not I will set it to range of dataset
+        # # Dynamically set training date range if not provided 
+        # train_start_date = args.train_start_date
+        # train_end_date = args.train_end_date
+
+        # if train_start_date is None:
+        #     train_start_date = df['timestamp'].min().strftime('%Y-%m-%d')
+        #     logger.info(f"No start date provided. Defaulting to dataset start date: {train_start_date}")
+
+        # if train_end_date is None:
+        #     train_end_date = df['timestamp'].max().strftime('%Y-%m-%d')
+        #     logger.info(f"No end date provided. Defaulting to dataset end date: {train_end_date}")
+        
+
+        # df_train = df[(df["timestamp"] >= args.train_start_date) & (df["timestamp"] <= args.train_end_date)].copy()
+        # X_train = create_sequences(df_train[FEATURES].values, args.window_size)
+        # X_test = create_sequences(df[FEATURES].values, args.window_size)
+
+        # # 3. Log Parameters
+        # mlflow_wrapper.log_params({
+        #     "dataset_filename": args.dataset_filename, "window_size": args.window_size,
+        #     "latent_dim": args.latent_dim, "epochs": args.epochs, "batch_size": args.batch_size,
+        #     # "train_start_date": args.train_start_date, "train_end_date": args.train_end_date,
+        #     "train_start_date": train_start_date, "train_end_date": train_end_date,
+        #     "threshold_sigma_multiplier": args.threshold_sigma_multiplier
+        # })
+
         # 2. Data Preparation
         dataset_path = os.path.join(DATA_DIR, args.dataset_filename)
         df, scaler, shap_background = load_and_prepare_data(dataset_path, args.stoppage_threshold)
 
-        df_train = df[(df["timestamp"] >= args.train_start_date) & (df["timestamp"] <= args.train_end_date)].copy()
+        # Dynamically set training date range if not provided
+        train_start_date = args.train_start_date
+        train_end_date = args.train_end_date
+
+        if train_start_date is None:
+            train_start_date = df['timestamp'].min().strftime('%Y-%m-%d')
+            logger.info(f"No start date provided. Defaulting to dataset start date: {train_start_date}")
+
+        if train_end_date is None:
+            train_end_date = df['timestamp'].max().strftime('%Y-%m-%d')
+            logger.info(f"No end date provided. Defaulting to dataset end date: {train_end_date}")
+
+        df_train = df[(df["timestamp"] >= train_start_date) & (df["timestamp"] <= train_end_date)].copy()
         X_train = create_sequences(df_train[FEATURES].values, args.window_size)
         X_test = create_sequences(df[FEATURES].values, args.window_size)
+        
+        if X_train.shape[0] == 0:
+            error_msg = f"Training data is empty after filtering for the date range '{train_start_date}' to '{train_end_date}'. Please check the dates."
+            raise ValueError(error_msg)
 
         # 3. Log Parameters
         mlflow_wrapper.log_params({
             "dataset_filename": args.dataset_filename, "window_size": args.window_size,
             "latent_dim": args.latent_dim, "epochs": args.epochs, "batch_size": args.batch_size,
-            "train_start_date": args.train_start_date, "train_end_date": args.train_end_date,
+            "train_start_date": train_start_date, 
+            "train_end_date": train_end_date,
             "threshold_sigma_multiplier": args.threshold_sigma_multiplier
         })
         
@@ -201,7 +250,11 @@ if __name__ == "__main__":
     
     # example usage:
     # python anomaly_health_model_training.py --tenant-id "27" --machine-id "242" --dataset-filename "iotts.energy_242.csv" --epochs 50 --window-size 15 --latent-dim 32
-    
+    # example production run:
+    # python anomaly_health_model_training.py ... --run-tag @production
+    # example testing run:
+    # python anomaly_health_model_training.py ... --run-tag @testing
+
     # Required Arguments
     parser.add_argument("--tenant-id", type=str, required=True, help="Tenant ID.")
     parser.add_argument("--machine-id", type=str, required=True, help="Machine ID.")
@@ -214,9 +267,13 @@ if __name__ == "__main__":
     parser.add_argument("--latent-dim", type=int, default=32, help="Dimension of the LSTM autoencoder's bottleneck.")
     parser.add_argument("--epochs", type=int, default=50, help="Number of training epochs.")
     parser.add_argument("--batch-size", type=int, default=32, help="Batch size for training.")
-    parser.add_argument("--train-start-date", type=str, default="2025-05-15", help="Start date for the training data slice (YYYY-MM-DD).")
-    parser.add_argument("--train-end-date", type=str, default="2025-05-28", help="End date for the training data slice (YYYY-MM-DD).")
+    # parser.add_argument("--train-start-date", type=str, default="2025-05-15", help="Start date for the training data slice (YYYY-MM-DD).")
+    # parser.add_argument("--train-end-date", type=str, default="2025-05-28", help="End date for the training data slice (YYYY-MM-DD).")
+    parser.add_argument("--train-start-date", type=str, default=None, help="Start date for training (YYYY-MM-DD). Defaults to the dataset's start date if not provided.")
+    parser.add_argument("--train-end-date", type=str, default=None, help="End date for training (YYYY-MM-DD). Defaults to the dataset's end date if not provided.")
     parser.add_argument("--threshold-sigma-multiplier", type=int, default=7, help="Multiplier for standard deviation to set the anomaly threshold.")
+
+    parser.add_argument("--run-tag", type=str, choices=["@production", "@testing"], default="@testing", help="Tag for the MLflow run: '@production' or '@testing'.")
 
     cli_args = parser.parse_args()
     main(cli_args)

@@ -115,6 +115,7 @@ def main(args):
     mlbase = MLflowBase(experiment_name)
     run = mlbase.start_run(run_name=args.run_name)
     run_id = run.info.run_id
+    mlflow.set_tag("run_tag", args.run_tag)
     logger.info(f"🚀 Started MLflow Run: {run_id} in Experiment: '{experiment_name}'")
 
     try:
@@ -199,6 +200,11 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a Rotor Fault Detection model and log to MLflow.")
 
+    # example usage production:
+    # python rotor_model_training.py --tenant-id "28" --machine-id "257" --dataset-filename "iotts.harmonics_257.csv" --run-tag @production
+    # example usage testing:
+    # python rotor_model_training.py --tenant-id "28" --machine-id "257" --dataset-filename "iotts.harmonics_257.csv" --run-tag @testing
+
     # Required Arguments
     parser.add_argument("--tenant-id", type=str, required=True, help="Tenant ID.")
     parser.add_argument("--machine-id", type=str, required=True, help="Machine ID.")
@@ -210,6 +216,8 @@ if __name__ == "__main__":
     parser.add_argument("--svm-nu", type=float, default=0.05, help="Nu parameter for OneClassSVM.")
     parser.add_argument("--svm-gamma", type=str, default="scale", help="Gamma parameter for OneClassSVM.")
     parser.add_argument("--sample-size", type=int, default=None, help="Optional: use a random sample of N rows for quick training.")
+
+    parser.add_argument("--run-tag", type=str, choices=["@production", "@testing"], default="@testing", help="Tag for the MLflow run: '@production' or '@testing'.")
 
     cli_args = parser.parse_args()
     main(cli_args)
