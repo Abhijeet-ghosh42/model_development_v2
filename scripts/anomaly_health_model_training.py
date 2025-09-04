@@ -1,7 +1,10 @@
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
 import argparse
 import json
 import logging
-import os
 import warnings
 
 import joblib
@@ -21,8 +24,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # --- Constants ---
-DATA_DIR = "data"
-ARTIFACTS_DIR = "artifacts"
+# DATA_DIR = "data"
+# ARTIFACTS_DIR = "artifacts"
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(ROOT_DIR, "data")
+ARTIFACTS_DIR = os.path.join(ROOT_DIR, "artifacts")
+
 FEATURES = ['cur1', 'cur2', 'cur3', 'pf1', 'pf2', 'pf3', 'vol1', 'vol2', 'vol3', 'thdi1', 'thdi2', 'thdi3', 'freq']
 
 # --- Helper Functions ---

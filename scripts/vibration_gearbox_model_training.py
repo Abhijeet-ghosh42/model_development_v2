@@ -1,7 +1,10 @@
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
 import argparse
 import json
 import logging
-import os
 import warnings
 
 import mlflow
@@ -20,8 +23,13 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # --- Constants ---
-DATA_DIR = "data"
-ARTIFACTS_DIR = "artifacts"
+# DATA_DIR = "data"
+# ARTIFACTS_DIR = "artifacts"
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(ROOT_DIR, "data")
+ARTIFACTS_DIR = os.path.join(ROOT_DIR, "artifacts")
+
 # These weights are based on domain knowledge and are part of the config
 FEATURE_WEIGHTS = {
     'kurtosis': 0.2,

@@ -1,6 +1,9 @@
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
 import argparse
 import logging
-import os
 import warnings
 
 import mlflow
@@ -17,8 +20,13 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # --- Constants ---
-DATA_DIR = "data"
-ARTIFACTS_DIR = "artifacts"
+# DATA_DIR = "data"
+# ARTIFACTS_DIR = "artifacts"
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(ROOT_DIR, "data")
+ARTIFACTS_DIR = os.path.join(ROOT_DIR, "artifacts")
+
 
 # --- Core Feature Engineering Functions ---
 
@@ -124,7 +132,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate Vibration-Based Rotor Fault configs for MLflow.")
 
     # example usage:
-    # python vibration_rotor_model_training.py --tenant-id "your_tenant_id" --machine-id "your_machine_id" --dataset-filename "iotts.vibration.csv" --rpm 1800
+    # python vibration_rotor_model_training.py --tenant-id "27" --machine-id "243" --dataset-filename "iotts.vibration_243.csv" --rpm 1800
 
     # Required Arguments
     parser.add_argument("--tenant-id", type=str, required=True, help="Tenant ID.")

@@ -1,6 +1,9 @@
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
 import argparse
 import logging
-import os
 import warnings
 
 import mlflow
@@ -19,8 +22,14 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # --- Constants ---
-DATA_DIR = "data"
-ARTIFACTS_DIR = "artifacts"
+# DATA_DIR = "data"
+# ARTIFACTS_DIR = "artifacts"
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(ROOT_DIR, "data")
+ARTIFACTS_DIR = os.path.join(ROOT_DIR, "artifacts")
+
+
 # These weights are part of the model's logic and will be stored in the config
 FEATURE_WEIGHTS = {
     'kurtosis': 0.25,
@@ -149,8 +158,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate Vibration-Based Bearing Fault configs for MLflow.")
 
     # example usage:
-    # python vibration_bearing_model_training.py --tenant-id "your_tenant_id" --machine-id "your_machine_id" --dataset-filename "iotts.vibration.csv" --bpfo 133.1 --bpfi 106.9
+    # python vibration_bearing_model_training.py --tenant-id "27" --machine-id "243" --dataset-filename "iotts.vibration_243.csv" --bpfo 133.1 --bpfi 106.9
     # tenant is 27, machine is 243 and dataset is iotts.vibration_243.csv
+    
     # Required Arguments
     parser.add_argument("--tenant-id", type=str, required=True, help="Tenant ID.")
     parser.add_argument("--machine-id", type=str, required=True, help="Machine ID.")

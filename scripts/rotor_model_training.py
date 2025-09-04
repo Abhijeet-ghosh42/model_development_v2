@@ -1,6 +1,9 @@
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
 import argparse
 import logging
-import os
 import time
 import warnings
 
@@ -21,8 +24,13 @@ warnings.filterwarnings("ignore")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-DATA_DIR = "data"
-ARTIFACTS_DIR = "artifacts"
+# DATA_DIR = "data"
+# ARTIFACTS_DIR = "artifacts"
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(ROOT_DIR, "data")
+ARTIFACTS_DIR = os.path.join(ROOT_DIR, "artifacts")
+
 
 # --- Model Training Class ---
 

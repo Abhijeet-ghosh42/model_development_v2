@@ -1,7 +1,10 @@
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
 import argparse
 import logging
 import math
-import os
 import re
 import warnings
 
@@ -19,9 +22,14 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Directory for input data
-DATA_DIR = "data"
-# Directory for local artifact output
-ARTIFACTS_DIR = "artifacts"
+# DATA_DIR = "data"
+# # Directory for local artifact output
+# ARTIFACTS_DIR = "artifacts"
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(ROOT_DIR, "data")
+ARTIFACTS_DIR = os.path.join(ROOT_DIR, "artifacts")
+
 
 # --- Helper Functions (from Notebook) ---
 

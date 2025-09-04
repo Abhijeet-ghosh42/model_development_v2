@@ -1,9 +1,11 @@
 # generate_config.py
 
+import sys, os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import argparse
 import logging
 import math
-import os
 import re
 import warnings
 from typing import Dict, List, Tuple
@@ -23,10 +25,15 @@ warnings.filterwarnings("ignore")
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Directory for input data
-DATA_DIR = "data"
-# Directory for local artifact output
-ARTIFACTS_DIR = "artifacts"
+# # Directory for input data
+# DATA_DIR = "data"
+# # Directory for local artifact output
+# ARTIFACTS_DIR = "artifacts"
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(ROOT_DIR, "data")
+ARTIFACTS_DIR = os.path.join(ROOT_DIR, "artifacts")
+
 
 # Feature weights (kept as a constant for simplicity for non-ML users)
 # To change this, a developer would edit the script directly.
