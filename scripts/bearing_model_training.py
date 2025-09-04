@@ -18,6 +18,8 @@ from mlflow_base import MLflowBase
 from scipy import stats
 from tqdm import tqdm
 
+from data_loaders import load_esa_harmonics_api, load_local_csv
+
 # --- Pre-Script Configuration & Constants ---
 
 # Suppress warnings for cleaner output
@@ -208,11 +210,40 @@ def main(args):
         })
 
         # 3. Load Data
-        dataset_path = os.path.join(DATA_DIR, args.dataset_filename)
-        logger.info(f"💾 Loading data from: {dataset_path}")
-        if not os.path.exists(dataset_path):
-            raise FileNotFoundError(f"Dataset not found at {dataset_path}. Please place it in the '{DATA_DIR}' folder.")
-        df = pd.read_csv(dataset_path)
+        # dataset_path = os.path.join(DATA_DIR, args.dataset_filename)
+        # logger.info(f"💾 Loading data from: {dataset_path}")
+        # if not os.path.exists(dataset_path):
+        #     raise FileNotFoundError(f"Dataset not found at {dataset_path}. Please place it in the '{DATA_DIR}' folder.")
+        # df = pd.read_csv(dataset_path)
+
+        # 3. Load Data (local CSV or API)
+        if args.source == "local":
+            dataset_path = os.path.join(DATA_DIR, args.dataset_filename)
+            logger.info(f"💾 Loading data (local): {dataset_path}")
+            if not os.path.exists(dataset_path):
+                raise FileNotFoundError(f"Dataset not found at {dataset_path}. Please place it in the '{DATA_DIR}' folder.")
+            df = load_local_csv(dataset_path)
+        else:
+            # API mode
+            if not all([args.api_base_url, args.api_key, args.start_datetime_utc, args.end_datetime_utc]):
+                raise ValueError("For --source api, provide --api-base-url, --api-key, --start-datetime-utc, and --end-datetime-utc")
+
+            logger.info(
+                f"🌐 Loading data (API): {args.api_base_url} | machine_id={args.machine_id} | "
+                f"{args.start_datetime_utc} → {args.end_datetime_utc}"
+            )
+            df = load_esa_harmonics_api(
+                base_url=args.api_base_url,
+                api_key=args.api_key,
+                machine_id=args.machine_id,
+                start_utc=args.start_datetime_utc,
+                end_utc=args.end_datetime_utc,
+                endpoint="/api/v1/energy/",
+                max_span_hours=args.max_span_hours,
+                extra_params={"response_type": "raw"},
+            )
+            if df.empty:
+                raise ValueError("API returned no data for the requested time range.")
 
         # 4. Feature Engineering
         logger.info("🛠️  Starting feature engineering...")
@@ -319,6 +350,9 @@ if __name__ == "__main__":
     # example testing run:
     # python bearing_model_training.py --tenant-id "28" --machine-id "257" --dataset-filename "iotts.harmonics_257.csv" --shaft-rpm 1480 --ball-diameter 8.0 --pitch-diameter 40.0 --num-elements 8 --run-tag @testing
     
+    # example usage with API data source:
+    # python bearing_model_training.py --tenant-id 28 --machine-id 257 --dataset-filename ignore.csv --shaft-rpm 1480 --ball-diameter 8 --pitch-diameter 40 --num-elements 8 --source api --api-base-url "https://iot.zolnoi.app" --api-key "mqdm_CgwNaRsb62Ziy5ePw" --start-datetime-utc "2025-08-01T01:30:00Z" --end-datetime-utc "2025-08-02T01:30:00Z"
+    
     # --- Required Arguments ---
     parser.add_argument("--tenant-id", type=str, required=True, help="Tenant ID for the machine.")
     parser.add_argument("--machine-id", type=str, required=True, help="Machine ID for the new equipment.")
@@ -337,6 +371,20 @@ if __name__ == "__main__":
     parser.add_argument("--bdf-threshold", type=float, default=0.9, help="Default BDF decision threshold (default: 0.7).")
 
     parser.add_argument("--run-tag", type=str, choices=["@production", "@testing"], default="@testing", help="Tag for the MLflow run: '@production' or '@testing'.")
+
+    # --- Data source toggle ---
+    parser.add_argument("--source", choices=["local", "api"], default="local",
+                        help="Where to load data from (default: local CSV).")
+    parser.add_argument("--api-base-url", type=str, default=os.getenv("IOT_API_BASE_URL"),
+                        help="API base URL (e.g., https://iot.zolnoi.app). Defaults to env IOT_API_BASE_URL.")
+    parser.add_argument("--api-key", type=str, default=os.getenv("IOT_API_KEY"),
+                        help="API key. Defaults to env IOT_API_KEY.")
+    parser.add_argument("--start-datetime-utc", type=str, default=None,
+                        help="UTC ISO8601 start (e.g., 2025-08-01T01:30:00Z). Required if --source api.")
+    parser.add_argument("--end-datetime-utc", type=str, default=None,
+                        help="UTC ISO8601 end (e.g., 2025-08-02T01:30:00Z). Required if --source api.")
+    parser.add_argument("--max-span-hours", type=int, default=24,
+                        help="Max hours per API chunk (≤24).")
 
     cli_args = parser.parse_args()
     main(cli_args)

@@ -1,5 +1,3 @@
-# data_loaders.py
-
 import os
 import time
 import datetime as dt
@@ -7,10 +5,51 @@ from typing import List, Dict, Any, Optional
 
 import pandas as pd
 
-try:
-    import requests
-except Exception as e:
-    raise ImportError("The 'requests' package is required. Install with: pip install requests") from e
+import requests
+import pandas as pd
+from datetime import datetime, timedelta
+
+"""
+data_loaders.py
+---------------
+
+This module centralizes all data loading logic for the predictive maintenance
+training scripts. It provides utilities to fetch data either from **local CSVs**
+or from the **IoT API** (energy, harmonics, vibration). Since the API can only
+serve up to 24 hours of data at once, the loaders automatically split a long
+time range into smaller chunks and then stitch the results back together into
+a single DataFrame.
+
+Functions
+~~~~~~~~~
+- _parse_iso_z(s) / _to_iso_z(t): Helpers to convert timestamps between
+  ISO8601 '...Z' strings and Python datetimes.
+
+- _chunk_ranges(start_utc, end_utc, max_span_hours):
+  Splits a long [start, end] UTC range into consecutive <=24h chunks.
+
+- load_esa_harmonics_api(...):
+  Calls the API to fetch ESA harmonics data in chunks, concatenates the JSON
+  payloads, deduplicates, sorts by timestamp, and returns a DataFrame.
+
+- load_local_csv(csv_path):
+  Convenience wrapper to read a local CSV into a DataFrame.
+
+- load_energy_api(...):
+  Fetches energy (time series) data in <=24h chunks from the API, returns a
+  concatenated DataFrame.
+
+- load_vibration_api(...):
+  Fetches vibration sensor data in <=24h chunks from the API, returns a
+  concatenated DataFrame.
+
+Notes
+~~~~~
+- All loaders return a pandas DataFrame (possibly empty if the API returns no data).
+- They apply basic normalization like timestamp parsing and deduplication.
+- Each script in `scripts/` can import these functions to switch between
+  local CSV training or API-based training without rewriting logic.
+"""
 
 
 def _parse_iso_z(s: str) -> dt.datetime:
@@ -143,3 +182,80 @@ def load_esa_harmonics_api(
 def load_local_csv(csv_path: str) -> pd.DataFrame:
     """Tiny convenience wrapper (kept for symmetry)."""
     return pd.read_csv(csv_path)
+
+def load_energy_api(base_url, api_key, machine_id, start_utc, end_utc,
+                    endpoint="/api/v1/energy/", max_span_hours=24, extra_params=None):
+    """
+    Fetch energy data from API in chunks (since API only supports ≤24h).
+    Returns: pd.DataFrame
+    """
+    headers = {"accept": "application/json", "api_key": api_key}
+    all_frames = []
+
+    start_dt = pd.to_datetime(start_utc)
+    end_dt = pd.to_datetime(end_utc)
+
+    while start_dt < end_dt:
+        batch_end = min(start_dt + timedelta(hours=max_span_hours), end_dt)
+
+        params = {
+            "type": extra_params.get("type", "energy") if extra_params else "energy",
+            "duration_type": "custom",
+            "response_type": "raw",
+            "start_time": start_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "end_time": batch_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "machine_id": machine_id,
+        }
+
+        url = f"{base_url.rstrip('/')}{endpoint}"
+        resp = requests.get(url, headers=headers, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+
+        if data:
+            df = pd.DataFrame(data)
+            if not df.empty:
+                all_frames.append(df)
+
+        start_dt = batch_end  # move to next chunk
+
+    if not all_frames:
+        return pd.DataFrame()
+
+    df_final = pd.concat(all_frames, ignore_index=True)
+    return df_final
+
+def load_vibration_api(base_url, api_key, machine_id, start_utc, end_utc,
+                       endpoint="/api/v1/vibration/", max_span_hours=24, extra_params=None):
+    """
+    Fetch vibration data from API in 24h chunks and return as a pandas DataFrame.
+    """
+    headers = {"accept": "application/json", "api_key": api_key}
+    start_dt = pd.to_datetime(start_utc)
+    end_dt = pd.to_datetime(end_utc)
+    dfs = []
+
+    while start_dt < end_dt:
+        chunk_end = min(start_dt + pd.Timedelta(hours=max_span_hours), end_dt)
+
+        params = {
+            "machine_id": machine_id,
+            "start_time": start_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "end_time": chunk_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "type": "vibration",
+            "response_type": "raw"
+        }
+        if extra_params:
+            params.update(extra_params)
+
+        url = base_url.rstrip("/") + endpoint
+        resp = requests.get(url, headers=headers, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+
+        if isinstance(data, list) and data:
+            dfs.append(pd.DataFrame(data))
+
+        start_dt = chunk_end
+
+    return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()

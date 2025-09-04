@@ -17,6 +17,8 @@ from tensorflow.keras.layers import LSTM, Dense, Input, RepeatVector, TimeDistri
 from tensorflow.keras.models import Model
 from tqdm import tqdm
 
+from data_loaders import load_energy_api, load_local_csv
+
 # --- Pre-Script Configuration & Constants ---
 
 warnings.filterwarnings("ignore")
@@ -70,10 +72,10 @@ def build_autoencoder(timesteps, n_features, latent_dim):
     model.compile(optimizer='adam', loss='mse')
     return model
 
-def build_and_save_config(config_path, raw_filepath, stoppage_threshold, threshold):
+def build_and_save_config(config_path, df_raw, stoppage_threshold, threshold):
     """Calculates baselines and signal limits to build the final config JSON."""
     logger.info("Building configuration file with signal baselines and limits...")
-    df_raw = pd.read_csv(raw_filepath)
+    # df_raw = pd.read_csv(raw_filepath)
     df_raw = df_raw[(df_raw['cur1'] >= stoppage_threshold) & (df_raw['cur2'] >= stoppage_threshold) & (df_raw['cur3'] >= stoppage_threshold)]
 
     baselines = {
@@ -163,8 +165,41 @@ def main(args):
         # })
 
         # 2. Data Preparation
-        dataset_path = os.path.join(DATA_DIR, args.dataset_filename)
-        df, scaler, shap_background = load_and_prepare_data(dataset_path, args.stoppage_threshold)
+        # dataset_path = os.path.join(DATA_DIR, args.dataset_filename)
+        # df, scaler, shap_background = load_and_prepare_data(dataset_path, args.stoppage_threshold)
+        if args.source == "local":
+            dataset_path = os.path.join(DATA_DIR, args.dataset_filename)
+            logger.info(f"💾 Loading energy data (local): {dataset_path}")
+            df, scaler, shap_background = load_and_prepare_data(dataset_path, args.stoppage_threshold)
+        else:
+            if not all([args.api_base_url, args.api_key, args.start_datetime_utc, args.end_datetime_utc]):
+                raise ValueError("For --source api, you must provide --api-base-url, --api-key, --start-datetime-utc, and --end-datetime-utc")
+            logger.info(
+                f"🌐 Loading energy data (API): {args.api_base_url} | machine_id={args.machine_id} | "
+                f"{args.start_datetime_utc} → {args.end_datetime_utc}"
+            )
+            df = load_energy_api(
+                base_url=args.api_base_url,
+                api_key=args.api_key,
+                machine_id=args.machine_id,
+                start_utc=args.start_datetime_utc,
+                end_utc=args.end_datetime_utc,
+                endpoint="/api/v1/energy/",
+                max_span_hours=args.max_span_hours,
+                extra_params={"type": "energy", "response_type": "raw"},
+            )
+            if df.empty:
+                raise ValueError("API returned no energy data for the requested time range.")
+
+            # same filtering/normalization as local
+            df["timestamp"] = pd.to_datetime(df["timestamp"])
+            df.dropna(subset=FEATURES, inplace=True)
+            df = df[(df['cur1'] >= args.stoppage_threshold) & (df['cur2'] >= args.stoppage_threshold) & (df['cur3'] >= args.stoppage_threshold)]
+
+            scaler = MinMaxScaler()
+            df[FEATURES] = scaler.fit_transform(df[FEATURES])
+            shap_background = df[FEATURES].sample(n=100, random_state=42)
+
 
         # Dynamically set training date range if not provided
         train_start_date = args.train_start_date
@@ -234,7 +269,9 @@ def main(args):
         joblib.dump(scaler, scaler_path)
         shap_background.to_csv(shap_path, index=False)
         
-        build_and_save_config(config_path, dataset_path, args.stoppage_threshold, threshold)
+        # build_and_save_config(config_path, dataset_path, args.stoppage_threshold, threshold)
+        build_and_save_config(config_path, df.copy(), args.stoppage_threshold, threshold)
+
 
         mlflow.keras.log_model(model, artifact_path="model")
         mlflow_wrapper.log_artifact(run_id, scaler_path)
@@ -262,6 +299,9 @@ if __name__ == "__main__":
     # example testing run:
     # python anomaly_health_model_training.py ... --run-tag @testing
 
+    # example usage using API data:
+    # python anomaly_health_model_training.py --tenant-id 28 --machine-id 257 --dataset-filename ignore.csv --epochs 2 --window-size 15 --latent-dim 32 --source api --api-base-url "https://iot.zolnoi.app" --api-key "mqdm_CgwNaRsb62Ziy5ePw" --start-datetime-utc "2025-08-01T01:30:00Z" --end-datetime-utc "2025-08-02T01:30:00Z"
+
     # Required Arguments
     parser.add_argument("--tenant-id", type=str, required=True, help="Tenant ID.")
     parser.add_argument("--machine-id", type=str, required=True, help="Machine ID.")
@@ -281,6 +321,20 @@ if __name__ == "__main__":
     parser.add_argument("--threshold-sigma-multiplier", type=int, default=7, help="Multiplier for standard deviation to set the anomaly threshold.")
 
     parser.add_argument("--run-tag", type=str, choices=["@production", "@testing"], default="@testing", help="Tag for the MLflow run: '@production' or '@testing'.")
+
+    # --- Data source toggle ---
+    parser.add_argument("--source", choices=["local", "api"], default="local",
+                        help="Where to load data from (default: local CSV).")
+    parser.add_argument("--api-base-url", type=str, default=os.getenv("IOT_API_BASE_URL"),
+                        help="API base URL (e.g., https://iot.zolnoi.app). Defaults to env IOT_API_BASE_URL.")
+    parser.add_argument("--api-key", type=str, default=os.getenv("IOT_API_KEY"),
+                        help="API key. Defaults to env IOT_API_KEY.")
+    parser.add_argument("--start-datetime-utc", type=str, default=None,
+                        help="UTC ISO8601 start (e.g., 2025-08-01T01:30:00Z). Required if --source api.")
+    parser.add_argument("--end-datetime-utc", type=str, default=None,
+                        help="UTC ISO8601 end (e.g., 2025-08-02T01:30:00Z). Required if --source api.")
+    parser.add_argument("--max-span-hours", type=int, default=24,
+                        help="Max hours per API chunk (≤24).")
 
     cli_args = parser.parse_args()
     main(cli_args)

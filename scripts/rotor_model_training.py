@@ -18,6 +18,8 @@ from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import OneClassSVM
 
+from data_loaders import load_esa_harmonics_api, load_local_csv
+
 # --- Pre-Script Configuration & Constants ---
 
 warnings.filterwarnings("ignore")
@@ -140,14 +142,44 @@ def main(args):
         mlbase.log_params(params_to_log)
 
         # 3. Load & Prepare Data
-        dataset_path = os.path.join(DATA_DIR, args.dataset_filename)
-        logger.info(f"💾 Loading data from: {dataset_path}")
-        if not os.path.exists(dataset_path):
-            raise FileNotFoundError(f"Dataset not found at {dataset_path}.")
+        # dataset_path = os.path.join(DATA_DIR, args.dataset_filename)
+        # logger.info(f"💾 Loading data from: {dataset_path}")
+        # if not os.path.exists(dataset_path):
+        #     raise FileNotFoundError(f"Dataset not found at {dataset_path}.")
         
-        df = pd.read_csv(dataset_path)
+        # df = pd.read_csv(dataset_path)
+        # drop_cols = [c for c in ["_id", "tenant_id", "machine_id", "type", "timestamp"] if c in df.columns]
+        # harmonics_data = df.drop(columns=drop_cols, errors="ignore")
+        
+        if args.source == "local":
+            dataset_path = os.path.join(DATA_DIR, args.dataset_filename)
+            logger.info(f"💾 Loading data (local): {dataset_path}")
+            if not os.path.exists(dataset_path):
+                raise FileNotFoundError(f"Dataset not found at {dataset_path}.")
+            df = load_local_csv(dataset_path)
+        else:
+            if not all([args.api_base_url, args.api_key, args.start_datetime_utc, args.end_datetime_utc]):
+                raise ValueError("For --source api, you must provide --api-base-url, --api-key, --start-datetime-utc, and --end-datetime-utc")
+            logger.info(
+                f"🌐 Loading data (API): {args.api_base_url} | machine_id={args.machine_id} | "
+                f"{args.start_datetime_utc} → {args.end_datetime_utc}"
+            )
+            df = load_esa_harmonics_api(
+                base_url=args.api_base_url,
+                api_key=args.api_key,
+                machine_id=args.machine_id,
+                start_utc=args.start_datetime_utc,
+                end_utc=args.end_datetime_utc,
+                endpoint="/api/v1/energy/",
+                max_span_hours=args.max_span_hours,
+                extra_params={"response_type": "raw"},
+            )
+            if df.empty:
+                raise ValueError("API returned no data for the requested time range.")
+
         drop_cols = [c for c in ["_id", "tenant_id", "machine_id", "type", "timestamp"] if c in df.columns]
         harmonics_data = df.drop(columns=drop_cols, errors="ignore")
+
 
         # 4. Train Model
         trainer = AdvancedRotorFaultTrainer(args.n_components, args.svm_nu, args.svm_gamma)
@@ -213,6 +245,10 @@ if __name__ == "__main__":
     # example usage testing:
     # python rotor_model_training.py --tenant-id "28" --machine-id "257" --dataset-filename "iotts.harmonics_257.csv" --run-tag @testing
 
+    # example usage with API source of data:
+    # python rotor_model_training.py --tenant-id 28 --machine-id 257 --dataset-filename ignore.csv --source api --api-base-url "https://iot.zolnoi.app" --api-key "mqdm_CgwNaRsb62Ziy5ePw" --start-datetime-utc "2025-08-01T01:30:00Z" --end-datetime-utc "2025-08-02T01:30:00Z"
+
+
     # Required Arguments
     parser.add_argument("--tenant-id", type=str, required=True, help="Tenant ID.")
     parser.add_argument("--machine-id", type=str, required=True, help="Machine ID.")
@@ -226,6 +262,20 @@ if __name__ == "__main__":
     parser.add_argument("--sample-size", type=int, default=None, help="Optional: use a random sample of N rows for quick training.")
 
     parser.add_argument("--run-tag", type=str, choices=["@production", "@testing"], default="@testing", help="Tag for the MLflow run: '@production' or '@testing'.")
+
+    # --- Data source toggle ---
+    parser.add_argument("--source", choices=["local", "api"], default="local",
+                        help="Where to load data from (default: local CSV).")
+    parser.add_argument("--api-base-url", type=str, default=os.getenv("IOT_API_BASE_URL"),
+                        help="API base URL (e.g., https://iot.zolnoi.app). Defaults to env IOT_API_BASE_URL.")
+    parser.add_argument("--api-key", type=str, default=os.getenv("IOT_API_KEY"),
+                        help="API key. Defaults to env IOT_API_KEY.")
+    parser.add_argument("--start-datetime-utc", type=str, default=None,
+                        help="UTC ISO8601 start (e.g., 2025-08-01T01:30:00Z). Required if --source api.")
+    parser.add_argument("--end-datetime-utc", type=str, default=None,
+                        help="UTC ISO8601 end (e.g., 2025-08-02T01:30:00Z). Required if --source api.")
+    parser.add_argument("--max-span-hours", type=int, default=24,
+                        help="Max hours per API chunk (≤24).")
 
     cli_args = parser.parse_args()
     main(cli_args)
