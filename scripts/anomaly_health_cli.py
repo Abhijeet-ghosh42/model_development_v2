@@ -1,10 +1,10 @@
-"""Main entry point for machine health monitoring pipeline."""
+"""CLI script for anomaly detection - maintains backward compatibility."""
 
 import sys
 from pathlib import Path
 
 # Add the experiments directory to Python path
-experiments_dir = Path(__file__).parent / "experiments"
+experiments_dir = Path(__file__).parent.parent / "experiments"
 if str(experiments_dir) not in sys.path:
     sys.path.insert(0, str(experiments_dir))
 
@@ -15,11 +15,11 @@ from machine_health import TrainingConfig, run_anomaly_detection_pipeline
 from utils.logging import logger
 
 # Create Typer app
-app = typer.Typer(help="Machine Health Monitoring Pipeline")
+app = typer.Typer(help="Run an anomaly detection experiment with LSTM Autoencoder.")
 
 
 @app.command()
-def run_anomaly_experiment(
+def run_experiment(
     run_name: str = typer.Option("LSTM Anomaly Run", "--run-name", "-r", help="MLflow run name"),
     tenant_id: int = typer.Option(28, "--tenant-id", "-t", help="Tenant ID"),
     machine_id: int = typer.Option(257, "--machine-id", "-m", help="Machine ID"),

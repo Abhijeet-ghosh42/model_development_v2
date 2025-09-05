@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 # Add the experiments directory to Python path
-experiments_dir = Path(__file__).parent / "experiments"
+experiments_dir = Path(__file__).parent.parent
 if str(experiments_dir) not in sys.path:
     sys.path.insert(0, str(experiments_dir))
 
